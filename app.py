@@ -26,16 +26,23 @@ if 'bibliotheque' not in st.session_state:
 def analyser_avec_ia(prompt):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
+        # Force la configuration sur la version stable de l'API
         genai.configure(api_key=api_key)
         
-        # On force le modèle le plus basique et stable qui existe
-        model = genai.GenerativeModel('gemini-pro') 
+        # On utilise spécifiquement le modèle flash avec le préfixe complet
+        model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
         
+        # Appel direct sans passer par les fonctions automatiques qui buggent
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        # On affiche l'erreur réelle pour comprendre le blocage
-        return f"Erreur technique Google : {str(e)}"
+        # Si le premier échoue, on tente une version alternative de nom
+        try:
+            model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+            response = model.generate_content(prompt)
+            return response.text
+        except:
+            return f"Détail de l'erreur : {str(e)}"
 
 # --- FONCTION PDF ---
 def generer_pdf(bien, analyse):
