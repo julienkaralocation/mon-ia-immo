@@ -23,36 +23,44 @@ if 'bibliotheque' not in st.session_state:
     st.session_state.bibliotheque = []
 
 # --- LOGIQUE IA ULTRA-ROBUSTE (Correction 404 Définitive) ---
-import requests
-import json
-
 def analyser_avec_ia(prompt):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
         headers = {'Content-Type': 'application/json'}
+        
+        # ÉTAPE 1 : On demande à Google la liste des modèles autorisés pour TA clé
+        list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+        list_res = requests.get(list_url)
+        
+        if list_res.status_code != 200:
+            return f"Erreur de clé : Google rejette la clé. Vérifie qu'elle est bien active sur AI Studio."
+            
+        models_data = list_res.json()
+        # On cherche un modèle qui accepte la génération de contenu
+        available_models = [
+            m['name'] for m in models_data.get('models', []) 
+            if 'generateContent' in m.get('supportedGenerationMethods', [])
+        ]
+        
+        if not available_models:
+            return "Aucun modèle de génération trouvé pour cette clé. Active Gemini 1.5 sur AI Studio."
+
+        # ÉTAPE 2 : On prend le meilleur modèle disponible (souvent le premier de la liste)
+        # On essaie de privilégier gemini-1.5-flash s'il est dans la liste
+        selected_model = next((m for m in available_models if "1.5-flash" in m), available_models[0])
+        
+        # ÉTAPE 3 : On lance l'analyse
+        gen_url = f"https://generativelanguage.googleapis.com/v1beta/{selected_model}:generateContent?key={api_key}"
         data = {"contents": [{"parts": [{"text": prompt}]}]}
         
-        # 1. On teste le modèle Flash (le plus rapide)
-        url_flash = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-        res = requests.post(url_flash, headers=headers, data=json.dumps(data))
-        
+        res = requests.post(gen_url, headers=headers, json=data)
         if res.status_code == 200:
             return res.json()['candidates'][0]['content']['parts'][0]['text']
-        
-        # 2. Si Flash échoue, on teste le modèle Pro (le plus stable)
-        url_pro = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
-        res = requests.post(url_pro, headers=headers, data=json.dumps(data))
-        
-        if res.status_code == 200:
-            return res.json()['candidates'][0]['content']['parts'][0]['text']
-            
-        # 3. Si tout échoue, on affiche le message d'erreur précis de Google
-        error_msg = res.json().get('error', {}).get('message', 'Erreur inconnue')
-        return f"Désolé, Google refuse l'accès : {error_msg}. Vérifie que ta clé API est bien active sur AI Studio."
+        else:
+            return f"Erreur lors de la génération ({res.status_code})."
 
     except Exception as e:
-        return f"Erreur de connexion : {str(e)}"
-
+        return f"Erreur système : {str(e)}"
 # --- FONCTION PDF ---
 def generer_pdf(bien, analyse):
     pdf = FPDF()
