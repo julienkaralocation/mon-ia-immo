@@ -5,112 +5,127 @@ from fpdf import FPDF
 from datetime import datetime
 import requests
 import json
+import gspread
 
-# --- CONFIGURATION STYLE APPLE ---
-st.set_page_config(page_title="ImmoScore Ultra V3", layout="wide", page_icon="💎")
+# --- FORCER LE MODE CLAIR ET COULEURS LISIBLES ---
+st.set_page_config(page_title="ImmoScore Ultra", layout="wide")
 
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; color: #1d1d1f; }
-    .stApp { background-color: #ffffff; }
-    div[data-testid="stMetric"] { background-color: #f5f5f7; border-radius: 20px; padding: 20px; border: 1px solid #e5e5e7; }
-    .stTextArea textarea { border-radius: 15px; border: 1px solid #e5e5e7; background-color: #f5f5f7; }
-    .stButton>button { background-color: #0071e3; color: white; border-radius: 25px; padding: 10px 25px; border: none; font-weight: 600; width: 100%; height: 3.5em; }
+    /* Force le texte en noir et fond blanc pour mobile */
+    html, body, [class*="css"], .stMarkdown, p, h1, h2, h3, h4, span, label { 
+        color: #1d1d1f !important; 
+    }
+    .stApp { background-color: #ffffff !important; }
+    
+    /* Input fields plus visibles */
+    input, textarea {
+        background-color: #f5f5f7 !important;
+        color: #1d1d1f !important;
+        border: 1px solid #d2d2d7 !important;
+    }
+    
+    /* Bouton Apple Bleu */
+    .stButton>button {
+        background-color: #0071e3 !important;
+        color: white !important;
+        border-radius: 20px;
+        border: none;
+        height: 3.5em;
+        font-weight: 600;
+    }
+    
+    /* Cartes de résultats */
+    div[data-testid="stMetric"] {
+        background-color: #f5f5f7 !important;
+        border: 1px solid #e5e5e7 !important;
+        border-radius: 20px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- BASE DE DONNÉES (Session State par défaut, prêt pour GSheets) ---
-if 'bibliotheque' not in st.session_state:
-    st.session_state.bibliotheque = []
+# --- FONCTION SAUVEGARDE GOOGLE SHEETS ---
+def sauvegarder_dans_gsheet(data_dict):
+    try:
+        # On utilise le lien direct via les secrets
+        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
+        sh = gc.open_by_url(st.secrets["GSHEET_URL"])
+        worksheet = sh.get_worksheet(0)
+        # On ajoute la ligne : Nom, Date, Renta, CF, Notes, Avis
+        worksheet.append_row([
+            data_dict['nom'], data_dict['date'], 
+            data_dict['renta'], data_dict['cf'], 
+            data_dict['notes'], data_dict['avis']
+        ])
+        return True
+    except Exception as e:
+        st.error(f"Erreur Google Sheet : {e}")
+        return False
 
-# --- LOGIQUE IA AUTO-DÉTECTION ---
+# --- LOGIQUE IA ---
 def analyser_avec_ia(prompt):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
         headers = {'Content-Type': 'application/json'}
         list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
         list_res = requests.get(list_url)
-        models_data = list_res.json()
-        available_models = [m['name'] for m in models_data.get('models', []) if 'generateContent' in m.get('supportedGenerationMethods', [])]
+        available_models = [m['name'] for m in list_res.json().get('models', []) if 'generateContent' in m.get('supportedGenerationMethods', [])]
         selected_model = next((m for m in available_models if "1.5-flash" in m), available_models[0])
         gen_url = f"https://generativelanguage.googleapis.com/v1beta/{selected_model}:generateContent?key={api_key}"
         res = requests.post(gen_url, headers=headers, json={"contents": [{"parts": [{"text": prompt}]}]})
         return res.json()['candidates'][0]['content']['parts'][0]['text']
-    except:
-        return "L'IA n'a pas pu répondre. Vérifiez votre clé API."
+    except: return "L'IA est momentanément indisponible."
 
 # --- INTERFACE ---
-st.title("ImmoScore Ultra")
-tab_calcul, tab_biblio = st.tabs(["💎 Analyseur Pro", "📂 Ma Database"])
+st.title("💎 ImmoScore Ultra")
 
-with tab_calcul:
-    col_inv, col_fin, col_res = st.columns([1, 1, 1.2], gap="large")
+col_inv, col_fin, col_res = st.columns([1, 1, 1.2], gap="medium")
 
-    with col_inv:
-        st.subheader("🏙️ Le Bien")
-        nom_projet = st.text_input("Nom du projet", "Studio Hypercentre")
-        prix_net = st.number_input("Prix d'achat (€)", value=150000)
-        travaux = st.number_input("Rénovation estimée (€)", value=10000)
-        type_achat = st.radio("Régime", ["Ancien", "Neuf"], horizontal=True)
-        tx_notaire = 0.075 if type_achat == "Ancien" else 0.025
-        total_acquisition = prix_net + travaux + int(prix_net * tx_notaire)
+with col_inv:
+    st.subheader("🏙️ Le Bien")
+    nom_projet = st.text_input("Nom du projet", "Appartement T2")
+    prix_net = st.number_input("Prix d'achat (€)", value=150000)
+    travaux = st.number_input("Travaux (€)", value=10000)
+    notes_investisseur = st.text_area("📝 Notes (Locataire, quartier, état...)", placeholder="Détaillez ici...")
+
+with col_fin:
+    st.subheader("🏦 Banque")
+    apport = st.slider("Apport (€)", 0, prix_net, 15000)
+    taux = st.slider("Taux (%)", 1.0, 5.0, 3.5, 0.1)
+    duree = st.select_slider("Années", options=[15, 20, 25], value=20)
+    # Calcul simplifié mensualité
+    total_pret = (prix_net + travaux + (prix_net * 0.08)) - apport
+    tm = (taux/100)/12
+    mensu = total_pret * (tm * (1+tm)**(duree*12)) / ((1+tm)**(duree*12) - 1) if total_pret > 0 else 0
+    st.info(f"Mensualité : {int(mensu)} €")
+
+with col_res:
+    st.subheader("📈 Résultat")
+    loyer = st.number_input("Loyer mensuel HC (€)", value=850)
+    renta = ((loyer * 12) / (prix_net + travaux)) * 100
+    cf = loyer - mensu - (loyer * 0.2) # Estimation charges/taxes 20%
+    st.metric("Cash-Flow estimé", f"{int(cf)} €/m")
+    st.metric("Renta brute", f"{renta:.2f} %")
+
+st.divider()
+
+if st.button("🚀 ANALYSER ET ENREGISTRER"):
+    with st.spinner("Analyse et sauvegarde..."):
+        prompt = f"Expert immo. Prix {prix_net}€, Loyer {loyer}€. Notes : {notes_investisseur}. Donne une note/10."
+        verdict = analyser_avec_ia(prompt)
         
-        # RÉINTÉGRATION DES NOTES
-        notes_investisseur = st.text_area("📝 Notes (Rénovation, locataires, quartier...)", 
-                                         placeholder="Ex: Locataire en place depuis 5 ans, toiture à réviser dans 3 ans, excellente sectorisation scolaire...")
-
-    with col_fin:
-        st.subheader("🏦 Financement")
-        apport = st.slider("Apport (€)", 0, total_acquisition, int(total_acquisition*0.1))
-        taux = st.slider("Taux (%)", 0.5, 6.0, 3.8, 0.1)
-        duree = st.select_slider("Durée (ans)", options=[15, 20, 25], value=20)
-        pret = total_acquisition - apport
-        if pret > 0:
-            tm = (taux/100)/12
-            mensualite = pret * (tm * (1+tm)**(duree*12)) / ((1+tm)**(duree*12) - 1)
-        else: mensualite = 0
-        st.info(f"Mensualité : {int(mensualite)} €/mois")
-
-    with col_res:
-        st.subheader("📈 Performance")
-        loyer_hc = st.number_input("Loyer mensuel HC (€)", value=800)
-        taxe_f = st.number_input("Taxe foncière (€/an)", value=750)
-        cf = (loyer_hc * 0.9) - mensualite - (taxe_f/12) # 10% frais gestion/vacance inclus
-        renta = ((loyer_hc * 12) - taxe_f) / total_acquisition * 100
+        # Données à sauvegarder
+        bien = {
+            "nom": nom_projet,
+            "date": datetime.now().strftime("%d/%m/%Y"),
+            "renta": f"{renta:.2f}%",
+            "cf": f"{int(cf)}€",
+            "notes": notes_investisseur,
+            "avis": verdict
+        }
         
-        st.metric("Cash-Flow (Net de gestion)", f"{int(cf)} €/mois")
-        st.metric("Rentabilité Nette", f"{renta:.2f} %")
-
-    st.divider()
-    
-    if st.button("🚀 ANALYSER ET ENREGISTRER DANS LA BASE"):
-        prompt = f"Expert immo. Analyse : Achat {total_acquisition}€, Loyer {loyer_hc}€, CF {int(cf)}€/mois. Notes de l'investisseur : {notes_investisseur}. Donne une note/10."
-        with st.spinner("L'IA étudie le dossier..."):
-            verdict = analyser_avec_ia(prompt)
-            bien = {
-                "id": datetime.now().timestamp(),
-                "nom": nom_projet,
-                "date": datetime.now().strftime("%d/%m/%Y"),
-                "renta": f"{renta:.2f}%",
-                "cf": f"{int(cf)}€",
-                "notes": notes_investisseur,
-                "avis": verdict
-            }
-            st.session_state.bibliotheque.append(bien)
-            st.success("Données sauvegardées !")
-            st.markdown(f"### 🤖 Verdict de l'IA\n{verdict}")
-
-with tab_biblio:
-    st.subheader("🗄️ Bibliothèque de Biens")
-    if not st.session_state.bibliotheque:
-        st.info("Aucun bien enregistré.")
-    else:
-        for b in reversed(st.session_state.bibliotheque):
-            with st.expander(f"📍 {b['nom']} - {b['renta']}"):
-                st.write(f"**Date :** {b['date']}")
-                st.write(f"**Notes investisseur :** {b['notes']}")
-                st.info(f"**Analyse IA :** {b['avis']}")
-                if st.button(f"🗑️ Supprimer", key=f"del_{b['id']}"):
-                    st.session_state.bibliotheque = [x for x in st.session_state.bibliotheque if x['id'] != b['id']]
-                    st.rerun()
+        # Tentative de sauvegarde
+        if sauvegarder_dans_gsheet(bien):
+            st.success("✅ Sauvegardé dans le Google Sheet !")
+        
+        st.markdown(f"### 🤖 Verdict\n{verdict}")
