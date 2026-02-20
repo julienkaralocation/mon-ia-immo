@@ -23,26 +23,33 @@ if 'bibliotheque' not in st.session_state:
     st.session_state.bibliotheque = []
 
 # --- LOGIQUE IA ULTRA-ROBUSTE (Correction 404 Définitive) ---
+import requests
+import json
+
 def analyser_avec_ia(prompt):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
-        # Force la configuration sur la version stable de l'API
-        genai.configure(api_key=api_key)
+        # URL de l'API Google (on force la version v1 au lieu de v1beta)
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
         
-        # On utilise spécifiquement le modèle flash avec le préfixe complet
-        model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
+        headers = {'Content-Type': 'application/json'}
+        data = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }
         
-        # Appel direct sans passer par les fonctions automatiques qui buggent
-        response = model.generate_content(prompt)
-        return response.text
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+        result = response.json()
+        
+        # Extraction de la réponse
+        if response.status_code == 200:
+            return result['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return f"Erreur API ({response.status_code}) : {result.get('error', {}).get('message', 'Erreur inconnue')}"
+            
     except Exception as e:
-        # Si le premier échoue, on tente une version alternative de nom
-        try:
-            model = genai.GenerativeModel(model_name="gemini-1.5-flash")
-            response = model.generate_content(prompt)
-            return response.text
-        except:
-            return f"Détail de l'erreur : {str(e)}"
+        return f"Erreur de connexion : {str(e)}"
 
 # --- FONCTION PDF ---
 def generer_pdf(bien, analyse):
