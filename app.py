@@ -61,50 +61,25 @@ c2.metric("Cash-Flow Mensuel", f"{cash_flow:.2f} €", delta=cash_flow)
 c3.metric("Coût Total Projet", f"{montant_total:,} €")
 
 # --- INTERVENTION DE L'IA ---
-if st.button("🚀 Analyser mon projet avec l'IA"):
+if st.button("🚀 Tester ma clé et voir les modèles"):
     if not api_key:
-        st.error("Oups ! Tu as oublié d'entrer ta clé API dans la barre latérale.")
+        st.error("Entre ta clé d'abord !")
     else:
         try:
             genai.configure(api_key=api_key)
+            models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            st.success("Ta clé fonctionne ! Voici les modèles disponibles pour toi :")
+            st.write(models)
             
-            # On essaie le nom le plus standard
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            prompt = f"""
-            Tu es un expert en investissement immobilier extrêmement strict et sincère. 
-            Ton critère n°1 est le CASH-FLOW (l'argent qui reste dans la poche chaque mois). 
-            
-            Voici les chiffres du projet :
-            - Montant total investi (Achat + Notaire + Travaux) : {montant_total}€
-            - Apport : {apport}€
-            - Loyer mensuel : {loyer_mensuel}€
-            - Mensualité crédit : {mensualite:.2f}€
-            - Charges/Taxes mensuelles : {charges_mensuelles}€
-            - CASH-FLOW NET : {cash_flow:.2f}€/mois
-            - Rentabilité nette : {renta_nette:.2f}%
-
-            Notes de l'utilisateur (travaux, locataires, emplacement) : {notes_utilisateur}
-
-            Ta mission :
-            1. Analyse cash-flow : Est-ce que l'investisseur s'enrichit ou s'appauvrit chaque mois ?
-            2. Analyse des risques : Que penses-tu des notes sur les travaux ou les locataires ?
-            3. Verdict : Donne une note sur 10 (sois sévère).
-            4. Conseils futurs : Donne 3 astuces pour améliorer ce projet ou les prochains.
-            """
-            
-            with st.spinner("L'expert analyse vos chiffres..."):
-                # On force l'utilisation de la version stable
-                response = model.generate_content(prompt)
-                st.subheader("🧐 Analyse de l'Expert IA")
-                st.write(response.text)
-                
+            # On prend le premier de la liste automatiquement pour tester
+            if models:
+                selected_model = models[0]
+                st.info(f"Essai automatique avec : {selected_model}")
+                model = genai.GenerativeModel(selected_model)
+                response = model.generate_content("Dis bonjour !")
+                st.write("Réponse de l'IA :", response.text)
         except Exception as e:
-            # Si gemini-1.5-flash échoue encore, on essaie le modèle pro par sécurité
-            try:
-                model_alt = genai.GenerativeModel('gemini-pro')
-                response = model_alt.generate_content(prompt)
-                st.subheader("🧐 Analyse de l'Expert IA (Mode Secours)")
+            st.error(f"Erreur de diagnostic : {e}")
                 st.write(response.text)
             except:
                 st.error(f"Erreur persistante : {e}. Vérifie que ta clé API est bien active sur Google AI Studio.")
