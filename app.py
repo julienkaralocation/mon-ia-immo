@@ -28,25 +28,14 @@ def analyser_avec_ia(prompt):
         api_key = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=api_key)
         
-        # Liste de modèles à tester (du plus récent au plus stable)
-        model_names = [
-            'gemini-1.5-flash', 
-            'models/gemini-1.5-flash', 
-            'gemini-1.5-pro',
-            'models/gemini-pro'
-        ]
+        # On force le modèle le plus basique et stable qui existe
+        model = genai.GenerativeModel('gemini-pro') 
         
-        for name in model_names:
-            try:
-                model = genai.GenerativeModel(name)
-                response = model.generate_content(prompt)
-                return response.text
-            except Exception:
-                continue # On passe au nom suivant si celui-ci échoue
-        
-        return "Erreur : Aucun modèle IA n'est accessible avec cette clé."
+        response = model.generate_content(prompt)
+        return response.text
     except Exception as e:
-        return f"Erreur de configuration : {str(e)}"
+        # On affiche l'erreur réelle pour comprendre le blocage
+        return f"Erreur technique Google : {str(e)}"
 
 # --- FONCTION PDF ---
 def generer_pdf(bien, analyse):
