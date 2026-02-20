@@ -1,106 +1,81 @@
 import streamlit as st
 import google.generativeai as genai
 import plotly.graph_objects as go
-from datetime import datetime
 
-# --- CONFIGURATION PRO ---
-st.set_page_config(page_title="ImmoInvest AI", page_icon="📈", layout="wide")
+# --- CONFIGURATION UI ---
+st.set_page_config(page_title="ImmoInvest Pro", layout="centered")
 
-# Design CSS Avancé
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
-    html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
-    .main { background-color: #f8f9fa; }
-    .stMetric { background-color: white; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; }
-    div[data-testid="stExpander"] { border-radius: 15px; background-color: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-    .stButton>button { border-radius: 12px; background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%); color: white; border: none; font-weight: bold; }
+    .stApp { background-color: #f4f7f6; }
+    [data-testid="stMetricValue"] { font-size: 1.8rem !important; color: #1e3a8a; }
+    .stButton>button { 
+        height: 3.5rem; border-radius: 12px; font-size: 1.1rem; 
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        border: none; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    div[data-testid="stExpander"] { border-radius: 15px; background-color: white !important; border: 1px solid #e5e7eb; }
     </style>
     """, unsafe_allow_html=True)
 
-# Récupération de la clé API via les Secrets
+# --- LOGIQUE IA ---
 try:
+    # On récupère la clé dans les secrets
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
 except:
-    st.error("⚠️ La clé API n'est pas configurée dans les Secrets de l'application.")
+    st.warning("⚠️ Configuration de la clé API manquante dans les Secrets.")
 
-# --- MOTEUR DE CALCUL DÉTAILLÉ ---
-with st.sidebar:
-    st.header("📍 Localisation & Type")
-    nom_bien = st.text_input("Nom du projet", "Appartement T3 - Centre")
-    ville = st.text_input("Ville", "Bordeaux")
-    type_bien = st.selectbox("Type", ["Ancien (7.5% notaire)", "Neuf (2.5% notaire)"])
-    notaire_taux = 0.025 if "Neuf" in type_bien else 0.075
+def appel_ia(prompt):
+    # Liste de secours des noms de modèles
+    noms_modeles = ['models/gemini-1.5-flash-latest', 'gemini-1.5-flash', 'models/gemini-pro']
+    for nom in noms_modeles:
+        try:
+            model = genai.GenerativeModel(nom)
+            res = model.generate_content(prompt)
+            return res.text
+        except:
+            continue
+    return "Désolé, l'IA est indisponible pour le moment."
 
-st.title("💎 ImmoInvest AI")
-st.markdown("##### L'expertise immobilière augmentée par l'intelligence artificielle.")
+# --- INTERFACE ---
+st.title("💎 ImmoInvest Pro")
+st.caption("L'assistant intelligent pour vos calculs de rentabilité")
 
-col_left, col_right = st.columns([1, 1.2], gap="large")
-
-with col_left:
-    with st.expander("💰 Coûts d'acquisition", expanded=True):
-        prix_net = st.number_input("Prix d'achat net vendeur (€)", value=150000, step=5000)
-        frais_agence = st.number_input("Frais d'agence (€)", value=0)
-        frais_notaire = int(prix_net * notaire_taux)
-        st.caption(f"Frais de notaire estimés : {frais_notaire} €")
-        travaux = st.number_input("Budget travaux (€)", value=10000)
-        mobilier = st.number_input("Ameublement (€)", value=0)
-        total_acquisition = prix_net + frais_agence + frais_notaire + travaux + mobilier
+# Section Calculs
+with st.expander("📍 Détails de l'Achat", expanded=True):
+    p_achat = st.number_input("Prix d'achat Net Vendeur (€)", value=120000, step=5000)
+    notaire_type = st.radio("Frais de notaire", ["Ancien (~7.5%)", "Neuf (~2.5%)"], horizontal=True)
+    tx_notaire = 0.075 if "Ancien" in notaire_type else 0.025
+    travaux = st.number_input("Budget Travaux (€)", value=10000)
     
-    with st.expander("🏦 Financement & Charges", expanded=True):
-        apport = st.number_input("Apport personnel (€)", value=20000)
-        taux = st.number_input("Taux d'intérêt (%)", value=3.8, format="%.2f")
-        duree = st.slider("Durée du prêt (ans)", 5, 25, 20)
-        montant_pret = total_acquisition - apport
-        
-        # Calcul mensualité
-        if montant_pret > 0:
-            tm = (taux/100)/12
-            n = duree * 12
-            mensualite = montant_pret * (tm * (1+tm)**n) / ((1+tm)**n - 1)
-        else: mensualite = 0
-        
-        st.info(f"Mensualité estimée : {int(mensualite)} €/mois")
-        taxe_fonciere = st.number_input("Taxe foncière annuelle (€)", value=800)
-        charges_copro = st.number_input("Charges copro annuelles (€)", value=600)
+    total_projet = p_achat + (p_achat * tx_notaire) + travaux
 
-with col_right:
-    with st.expander("📈 Revenus Locatifs", expanded=True):
-        loyer_hc = st.number_input("Loyer mensuel HC (€)", value=850)
-        vacance = st.slider("Vacance locative (%)", 0, 10, 5)
-        loyer_annuel_net = (loyer_hc * 12) * (1 - vacance/100)
-    
-    # CALCULS FINAUX
-    charges_annuelles = taxe_fonciere + charges_copro
-    cash_flow_mensuel = (loyer_annuel_net / 12) - mensualite - (charges_annuelles / 12)
-    renta_nette = ((loyer_annuel_net - charges_annuelles) / total_acquisition) * 100
+with st.expander("📊 Revenus & Charges", expanded=True):
+    loyer = st.number_input("Loyer Mensuel HC (€)", value=750)
+    mensualite = st.number_input("Mensualité Crédit (€)", value=500)
+    charges = st.number_input("Charges + Taxe Foncière / mois (€)", value=120)
 
-    # AFFICHAGE DASHBOARD
-    st.subheader("Bilan Financier")
-    c1, c2 = st.columns(2)
-    c1.metric("Cash-Flow Mensuel", f"{int(cash_flow_mensuel)} €", delta=f"{int(cash_flow_mensuel)} €")
-    c2.metric("Rentabilité Nette", f"{renta_nette:.2f} %")
+# Calculs finaux
+cf = loyer - mensualite - charges
+renta = ((loyer - charges) * 12 / total_projet) * 100 if total_projet > 0 else 0
 
-    # GRAPHIQUE
-    labels = ['Crédit', 'Charges/Impôts', 'Cash-Flow']
-    v_cf = max(0, cash_flow_mensuel)
-    fig = go.Figure(data=[go.Pie(labels=labels, values=[mensualite, charges_annuelles/12, v_cf], hole=.4)])
-    fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250)
-    st.plotly_chart(fig, use_container_width=True)
+# Dashboard Visuel
+st.divider()
+c1, c2 = st.columns(2)
+c1.metric("Cash-flow", f"{cf} €/mois")
+c2.metric("Renta Nette", f"{renta:.2f} %")
 
-# --- ANALYSE IA ---
-if st.button("✨ GÉNÉRER L'ANALYSE EXPERT"):
-    try:
-        model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
-        prompt = f"""Analyse ce projet à {ville}:
-        Achat: {total_acquisition}€, Loyer: {loyer_hc}€, Cashflow: {cash_flow_mensuel}€/mois. 
-        Renta: {renta_nette}%. Travaux: {travaux}€. Notes: {nom_bien}.
-        Sois très strict. Donne une note /10 et analyse si le projet est viable ou dangereux."""
-        
-        with st.spinner("L'IA analyse le marché..."):
-            response = model.generate_content(prompt)
-            st.markdown("### 🤖 Verdict de l'IA")
-            st.write(response.text)
-    except Exception as e:
-        st.error(f"L'analyse a échoué. Vérifiez votre configuration. ({e})")
+# Graphique
+fig = go.Figure(data=[go.Pie(labels=['Charges/Crédit', 'Bénéfice Net'], 
+                             values=[mensualite + charges, max(0, cf)],
+                             hole=.5, marker_colors=['#e5e7eb', '#3b82f6'])])
+fig.update_layout(height=250, margin=dict(t=0, b=0, l=0, r=0))
+st.plotly_chart(fig, use_container_width=True)
+
+# Bouton IA
+if st.button("✨ Obtenir l'Analyse de l'IA"):
+    prompt_expert = f"Analyse ce bien : Achat {total_projet}€, Loyer {loyer}€, Cashflow {cf}€/mois. Sois très critique et donne une note sur 10."
+    with st.spinner("Analyse en cours..."):
+        verdict = appel_ia(prompt_expert)
+        st.info(f"### 🤖 Verdict de l'Expert\n{verdict}")
