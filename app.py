@@ -29,25 +29,27 @@ import json
 def analyser_avec_ia(prompt):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
-        # URL de l'API Google (on force la version v1 au lieu de v1beta)
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
-        
         headers = {'Content-Type': 'application/json'}
-        data = {
-            "contents": [{
-                "parts": [{"text": prompt}]
-            }]
-        }
+        data = {"contents": [{"parts": [{"text": prompt}]}]}
         
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-        result = response.json()
+        # 1. On teste le modèle Flash (le plus rapide)
+        url_flash = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        res = requests.post(url_flash, headers=headers, data=json.dumps(data))
         
-        # Extraction de la réponse
-        if response.status_code == 200:
-            return result['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return f"Erreur API ({response.status_code}) : {result.get('error', {}).get('message', 'Erreur inconnue')}"
+        if res.status_code == 200:
+            return res.json()['candidates'][0]['content']['parts'][0]['text']
+        
+        # 2. Si Flash échoue, on teste le modèle Pro (le plus stable)
+        url_pro = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={api_key}"
+        res = requests.post(url_pro, headers=headers, data=json.dumps(data))
+        
+        if res.status_code == 200:
+            return res.json()['candidates'][0]['content']['parts'][0]['text']
             
+        # 3. Si tout échoue, on affiche le message d'erreur précis de Google
+        error_msg = res.json().get('error', {}).get('message', 'Erreur inconnue')
+        return f"Désolé, Google refuse l'accès : {error_msg}. Vérifie que ta clé API est bien active sur AI Studio."
+
     except Exception as e:
         return f"Erreur de connexion : {str(e)}"
 
