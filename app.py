@@ -61,25 +61,36 @@ c2.metric("Cash-Flow Mensuel", f"{cash_flow:.2f} €", delta=cash_flow)
 c3.metric("Coût Total Projet", f"{montant_total:,} €")
 
 # --- INTERVENTION DE L'IA ---
-if st.button("🚀 Tester ma clé et voir les modèles"):
+if st.button("🚀 Analyser mon projet avec l'IA"):
     if not api_key:
         st.error("Entre ta clé d'abord !")
     else:
         try:
             genai.configure(api_key=api_key)
+            # On liste les modèles pour ne plus avoir l'erreur 404
             models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            st.success("Ta clé fonctionne ! Voici les modèles disponibles pour toi :")
-            st.write(models)
             
-            # On prend le premier de la liste automatiquement pour tester
             if models:
-                selected_model = models[0]
-                st.info(f"Essai automatique avec : {selected_model}")
-                model = genai.GenerativeModel(selected_model)
-                response = model.generate_content("Dis bonjour !")
-                st.write("Réponse de l'IA :", response.text)
+                # On choisit le modèle flash s'il existe, sinon le premier de la liste
+                model_name = 'models/gemini-1.5-flash' if 'models/gemini-1.5-flash' in models else models[0]
+                model = genai.GenerativeModel(model_name)
+                
+                prompt = f"""
+                Tu es un expert immobilier strict. Analyse ce projet :
+                - Total investi : {montant_total}€
+                - Loyer : {loyer_mensuel}€
+                - Cash-flow : {cash_flow:.2f}€/mois
+                - Renta nette : {renta_nette:.2f}%
+                - Notes : {notes_utilisateur}
+                
+                Donne un avis cash, une note sur 10 et 3 conseils.
+                """
+                
+                with st.spinner(f"Analyse en cours avec {model_name}..."):
+                    response = model.generate_content(prompt)
+                    st.subheader("🧐 Analyse de l'Expert IA")
+                    st.write(response.text)
+            else:
+                st.error("Aucun modèle disponible avec cette clé.")
         except Exception as e:
             st.error(f"Erreur de diagnostic : {e}")
-                st.write(response.text)
-            except:
-                st.error(f"Erreur persistante : {e}. Vérifie que ta clé API est bien active sur Google AI Studio.")
