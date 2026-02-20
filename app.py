@@ -1,76 +1,100 @@
 import streamlit as st
 import google.generativeai as genai
 import plotly.graph_objects as go
-from fpdf import FPDF
+from datetime import datetime
 
-# --- CONFIGURATION ---
-st.set_page_config(page_title="IA Immo Pro", layout="wide")
-st.title("🏠 IA Investisseur Pro : Analyse & Rapport")
+# --- CONFIGURATION ESTHÉTIQUE ---
+st.set_page_config(page_title="ImmoScore IA", page_icon="💎", layout="centered")
 
-with st.sidebar:
-    st.header("Configuration")
-    api_key = st.text_input("Clé API Gemini :", type="password")
+# Style CSS pour arrondir les angles et épurer l'interface
+st.markdown("""
+    <style>
+    .stButton>button {width: 100%; border-radius: 10px; height: 3em; background-color: #007BFF; color: white;}
+    .reportview-container .main .block-container {padding-top: 2rem;}
+    .stMetric {background-color: #f0f2f6; padding: 15px; border-radius: 10px;}
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- FORMULAIRE ---
-col_in, col_graph = st.columns([1, 1])
+# Initialisation de la bibliothèque en mémoire
+if 'bibliotheque' not in st.session_state:
+    st.session_state.bibliotheque = []
 
-with col_in:
-    prix_achat = st.number_input("Prix d'achat (€)", value=150000)
-    frais_notaire = st.number_input("Frais de notaire (€)", value=int(prix_achat * 0.075))
-    travaux = st.number_input("Travaux (€)", value=0)
-    loyer = st.number_input("Loyer mensuel HC (€)", value=800)
-    charges = st.number_input("Charges + Taxe foncière / mois (€)", value=150)
-    
-    # Calcul prêt rapide
-    apport = st.number_input("Apport (€)", value=20000)
-    montant_pret = (prix_achat + frais_notaire + travaux) - apport
-    mensualite = st.number_input("Mensualité crédit estimée (€)", value=650)
-    notes = st.text_area("Notes sur le bien (emplacement, état...)")
-
-# --- CALCULS & GRAPHIQUE ---
-total_projet = prix_achat + frais_notaire + travaux
-cash_flow = loyer - mensualite - charges
-
-with col_graph:
-    st.subheader("📊 Répartition Mensuelle")
-    if loyer > 0:
-        # On évite le bénéfice négatif dans le graphique pour la clarté
-        benef_graph = max(0, cash_flow)
-        labels = ['Crédit', 'Charges/Taxes', 'Cash-Flow Net']
-        values = [mensualite, charges, benef_graph]
-        
-        fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.3, marker_colors=['#EF553B', '#636EFA', '#00CC96'])])
-        st.plotly_chart(fig)
-    else:
-        st.info("Entrez un loyer pour voir le graphique.")
-
-# --- ANALYSE IA ---
-analyse_texte = ""
-if st.button("🚀 Lancer l'Analyse Expert"):
-    if api_key:
+# --- LOGIQUE IA SÉCURISÉE ---
+def analyser_bien(api_key, donnees):
+    try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        prompt = f"Expert immo strict. Analyse : Total {total_projet}€, Loyer {loyer}€, Cashflow {cash_flow}€/mois. Notes : {notes}. Donne un verdict cash et 3 conseils."
+        # Auto-détection du modèle disponible
+        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        model_name = 'models/gemini-1.5-flash' if 'models/gemini-1.5-flash' in models else models[0]
+        model = genai.GenerativeModel(model_name)
         
+        prompt = f"""Expert immo strict. Analyse ce bien : {donnees}. 
+        Donne une note sur 10, un verdict cash (cash-flow priority) et 2 conseils précis."""
         res = model.generate_content(prompt)
-        analyse_texte = res.text
-        st.markdown(analyse_texte)
+        return res.text
+    except Exception as e:
+        return f"L'IA n'a pas pu répondre : {str(e)}"
+
+# --- NAVIGATION ---
+tab1, tab2 = st.tabs(["🆕 Nouveau Calcul", "📚 Ma Bibliothèque"])
+
+with tab1:
+    st.header("Analyse de Bien")
+    nom_bien = st.text_input("Nom du projet (ex: T2 centre-ville)", "Mon Investissement")
+    
+    with st.expander("💰 Chiffres de l'achat", expanded=True):
+        p_achat = st.number_input("Prix d'achat (€)", value=100000)
+        f_notaire = st.number_input("Frais de notaire (€)", value=int(p_achat * 0.08))
+        travaux = st.number_input("Travaux estimés (€)", value=0)
+        total_proj = p_achat + f_notaire + travaux
+
+    with st.expander("📈 Revenus & Charges", expanded=True):
+        loyer = st.number_input("Loyer mensuel HC (€)", value=600)
+        mensualite = st.number_input("Mensualité crédit (€)", value=450)
+        charges = st.number_input("Charges + Taxe foncière / mois (€)", value=100)
+        notes = st.text_area("Observations (travaux, quartier, locataire...)")
+
+    cash_flow = loyer - mensualite - charges
+    renta_net = ((loyer - charges) * 12 / total_proj) * 100 if total_proj > 0 else 0
+
+    # Affichage des scores rapides
+    c1, c2 = st.columns(2)
+    c1.metric("Cash-Flow", f"{cash_flow} €/mois")
+    c2.metric("Renta Nette", f"{renta_net:.2f} %")
+
+    if st.button("🧐 Analyser et Enregistrer"):
+        if not api_key:
+            st.warning("Veuillez entrer votre clé API dans la barre latérale.")
+        else:
+            avis_ia = analyser_bien(api_key, {"total": total_proj, "cashflow": cash_flow, "notes": notes})
+            # Sauvegarde dans la bibliothèque
+            bien = {
+                "nom": nom_bien,
+                "date": datetime.now().strftime("%d/%m/%Y"),
+                "score": renta_net,
+                "cashflow": cash_flow,
+                "avis": avis_ia
+            }
+            st.session_state.bibliotheque.append(bien)
+            st.success("Bien analysé et ajouté à la bibliothèque !")
+            st.markdown(f"### Verdict de l'IA :\n{avis_ia}")
+
+with tab2:
+    st.header("Tes Biens Enregistrés")
+    if not st.session_state.bibliotheque:
+        st.info("Aucun bien enregistré pour le moment.")
     else:
-        st.error("Clé API manquante.")
+        for b in reversed(st.session_state.bibliotheque):
+            with st.container():
+                st.markdown(f"""
+                ---
+                ### {b['nom']} ({b['date']})
+                **Note Renta :** {b['score']:.2f}% | **Cash-flow :** {b['cashflow']}€/mois
+                """)
+                with st.expander("Voir l'analyse détaillée"):
+                    st.write(b['avis'])
 
-# --- EXPORT PDF ---
-if analyse_texte:
-    def create_pdf(content):
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", 'B', 16)
-        pdf.cell(200, 10, "Rapport d'Investissement Immobilier", ln=True, align='C')
-        pdf.set_font("Arial", size=12)
-        pdf.ln(10)
-        pdf.cell(200, 10, f"Projet : {total_projet:,} euros", ln=True)
-        pdf.cell(200, 10, f"Cash-flow : {cash_flow} euros/mois", ln=True)
-        pdf.ln(5)
-        pdf.multi_cell(0, 10, f"Analyse de l'IA :\n{content}")
-        return pdf.output(dest='S').encode('latin-1', 'replace')
-
-    st.download_button(label="📥 Télécharger le Rapport PDF", data=create_pdf(analyse_texte), file_name="analyse_immo.pdf", mime="application/pdf")
+# Sidebar pour la clé
+with st.sidebar:
+    st.title("Paramètres")
+    api_key = st.text_input("Clé API Gemini", type="password")
