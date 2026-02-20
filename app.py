@@ -13,7 +13,7 @@ st.markdown("""
     html, body, [class*="css"] { font-family: 'Inter', sans-serif; color: #1d1d1f; }
     .stApp { background-color: #ffffff; }
     div[data-testid="stMetric"] { background-color: #f5f5f7; border-radius: 20px; padding: 20px; border: 1px solid #e5e5e7; }
-    .stButton>button { background-color: #0071e3; color: white; border-radius: 25px; padding: 10px 25px; border: none; font-weight: 600; width: 100%; transition: all 0.3s ease; }
+    .stButton>button { background-color: #0071e3; color: white; border-radius: 25px; padding: 10px 25px; border: none; font-weight: 600; width: 100%; transition: all 0.3s ease; height: 3em;}
     .stButton>button:hover { background-color: #0077ed; transform: scale(1.02); }
     </style>
     """, unsafe_allow_html=True)
@@ -22,15 +22,31 @@ st.markdown("""
 if 'bibliotheque' not in st.session_state:
     st.session_state.bibliotheque = []
 
-# --- LOGIQUE IA SÉCURISÉE (Correction 404) ---
-def config_ia():
+# --- LOGIQUE IA ULTRA-ROBUSTE (Correction 404 Définitive) ---
+def analyser_avec_ia(prompt):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
-        # On force la version stable v1 pour éviter l'erreur v1beta
-        genai.configure(api_key=api_key, transport='grpc') 
-        return genai.GenerativeModel('gemini-1.5-flash')
-    except:
-        return None
+        genai.configure(api_key=api_key)
+        
+        # Liste de modèles à tester (du plus récent au plus stable)
+        model_names = [
+            'gemini-1.5-flash', 
+            'models/gemini-1.5-flash', 
+            'gemini-1.5-pro',
+            'models/gemini-pro'
+        ]
+        
+        for name in model_names:
+            try:
+                model = genai.GenerativeModel(name)
+                response = model.generate_content(prompt)
+                return response.text
+            except Exception:
+                continue # On passe au nom suivant si celui-ci échoue
+        
+        return "Erreur : Aucun modèle IA n'est accessible avec cette clé."
+    except Exception as e:
+        return f"Erreur de configuration : {str(e)}"
 
 # --- FONCTION PDF ---
 def generer_pdf(bien, analyse):
@@ -41,10 +57,11 @@ def generer_pdf(bien, analyse):
     pdf.ln(10)
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, f"Date: {bien['date']}", ln=True)
+    pdf.cell(200, 10, f"Total Investi: {bien['total']:,} euros", ln=True)
     pdf.cell(200, 10, f"Rentabilite Nette: {bien['renta']:.2f}%", ln=True)
     pdf.cell(200, 10, f"Cash-Flow: {bien['cf']} euros/mois", ln=True)
     pdf.ln(10)
-    pdf.multi_cell(0, 10, f"Analyse de l'expert :\n{analyse}")
+    pdf.multi_cell(0, 10, f"Analyse de l'expert :\n{analyse}".encode('latin-1', 'replace').decode('latin-1'))
     return pdf.output(dest='S').encode('latin-1', 'replace')
 
 # --- INTERFACE PRINCIPALE ---
@@ -75,7 +92,8 @@ with tab_calcul:
         pret = total_acquisition - apport
         if pret > 0:
             tm = (taux/100)/12
-            mensualite = pret * (tm * (1+tm)**(duree*12)) / ((1+tm)**(duree*12) - 1)
+            n = duree * 12
+            mensualite = pret * (tm * (1+tm)**n) / ((1+tm)**n - 1)
         else: mensualite = 0
         st.info(f"Mensualité : {int(mensualite)} €/mois")
 
@@ -83,8 +101,8 @@ with tab_calcul:
         st.subheader("📈 Rendement")
         loyer_hc = st.number_input("Loyer mensuel HC (€)", value=950)
         taxe_f = st.number_input("Taxe foncière annuelle (€)", value=900)
-        gestion = st.slider("Frais de gestion/Assurance (%)", 0, 15, 7)
-        vacance = st.slider("Vacance locative (%)", 0, 10, 3)
+        gestion = st.slider("Gestion/Assurance (%)", 0, 15, 7)
+        vacance = st.slider("Vacance (%)", 0, 10, 3)
         revenu_annuel = (loyer_hc * 12) * (1 - (vacance + gestion)/100)
         cash_flow = (revenu_annuel / 12) - mensualite - (taxe_f / 12)
         renta_nette = ((revenu_annuel - taxe_f) / total_acquisition) * 100
@@ -94,33 +112,27 @@ with tab_calcul:
     st.divider()
     
     if st.button("✨ LANCER L'AUDIT & SAUVEGARDER"):
-        model = config_ia()
-        if model:
-            prompt = f"Expert immo strict. Analyse : Achat {total_acquisition}€, Loyer {loyer_hc}€, Cashflow {cash_flow}€/mois. Renta {renta_nette:.2f}%. Sois très critique, donne une note /10 et identifie le risque."
-            try:
-                with st.spinner("L'IA analyse votre projet..."):
-                    response = model.generate_content(prompt)
-                    verdict = response.text
-                    # Sauvegarde
-                    bien = {
-                        "id": datetime.now().timestamp(),
-                        "nom": nom_projet,
-                        "date": datetime.now().strftime("%d/%m/%Y"),
-                        "renta": renta_nette,
-                        "cf": int(cash_flow),
-                        "avis": verdict
-                    }
-                    st.session_state.bibliotheque.append(bien)
-                    st.success("Analyse terminée et ajoutée à la bibliothèque !")
-                    st.markdown(f"### 🤖 Verdict\n{verdict}")
-                    
-                    # Bouton PDF
-                    pdf_data = generer_pdf(bien, verdict)
-                    st.download_button("📥 Télécharger le Rapport PDF", data=pdf_data, file_name=f"Rapport_{nom_projet}.pdf")
-            except Exception as e:
-                st.error(f"Erreur lors de l'analyse : {e}")
-        else:
-            st.error("IA non configurée. Vérifiez vos Secrets.")
+        prompt = f"Expert immo strict. Analyse : Achat {total_acquisition}€, Loyer {loyer_hc}€, Cashflow {cash_flow}€/mois. Renta {renta_nette:.2f}%. Sois très critique, donne une note /10 et identifie le risque."
+        with st.spinner("L'IA analyse votre projet..."):
+            verdict = analyser_avec_ia(prompt)
+            if "Erreur" in verdict:
+                st.error(verdict)
+            else:
+                bien = {
+                    "id": datetime.now().timestamp(),
+                    "nom": nom_projet,
+                    "date": datetime.now().strftime("%d/%m/%Y"),
+                    "total": total_acquisition,
+                    "renta": renta_nette,
+                    "cf": int(cash_flow),
+                    "avis": verdict
+                }
+                st.session_state.bibliotheque.append(bien)
+                st.success("Analyse terminée !")
+                st.markdown(f"### 🤖 Verdict\n{verdict}")
+                
+                pdf_data = generer_pdf(bien, verdict)
+                st.download_button("📥 Télécharger le Rapport PDF", data=pdf_data, file_name=f"Rapport_{nom_projet}.pdf")
 
 with tab_biblio:
     st.subheader("Mes Projets Enregistrés")
@@ -129,8 +141,9 @@ with tab_biblio:
     else:
         for i, b in enumerate(reversed(st.session_state.bibliotheque)):
             with st.expander(f"{b['nom']} - {b['renta']:.2f}% Renta"):
-                st.write(f"**Cash-flow :** {b['cf']}€/mois")
-                st.write(f"**Analyse :** {b['avis']}")
+                st.write(f"**Date :** {b['date']} | **Investissement :** {b['total']:,} €")
+                st.write(f"**Cash-flow :** {b['cf']} €/mois")
+                st.info(f"**Analyse :**\n{b['avis']}")
                 if st.button(f"Supprimer {b['nom']}", key=f"del_{b['id']}"):
                     st.session_state.bibliotheque.pop(len(st.session_state.bibliotheque)-1-i)
                     st.rerun()
