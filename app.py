@@ -92,7 +92,7 @@ with col_right:
 # --- ANALYSE IA ---
 if st.button("✨ GÉNÉRER L'ANALYSE EXPERT"):
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
         prompt = f"""Analyse ce projet à {ville}:
         Achat: {total_acquisition}€, Loyer: {loyer_hc}€, Cashflow: {cash_flow_mensuel}€/mois. 
         Renta: {renta_nette}%. Travaux: {travaux}€. Notes: {nom_bien}.
