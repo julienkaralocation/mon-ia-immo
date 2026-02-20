@@ -67,35 +67,44 @@ if st.button("🚀 Analyser mon projet avec l'IA"):
     else:
         try:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('models/gemini-1.5-flash')
+            
+            # On essaie le nom le plus standard
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
             prompt = f"""
             Tu es un expert en investissement immobilier extrêmement strict et sincère. 
-            Ton critère n°1 est le CASH-FLOW. 
-            Voici les chiffres d'un projet :
-            - Prix achat : {prix_achat}€
-            - Frais notaire : {frais_notaire}€
-            - Travaux : {travaux}€
+            Ton critère n°1 est le CASH-FLOW (l'argent qui reste dans la poche chaque mois). 
+            
+            Voici les chiffres du projet :
+            - Montant total investi (Achat + Notaire + Travaux) : {montant_total}€
             - Apport : {apport}€
             - Loyer mensuel : {loyer_mensuel}€
+            - Mensualité crédit : {mensualite:.2f}€
             - Charges/Taxes mensuelles : {charges_mensuelles}€
-            - Cash-flow net calculé : {cash_flow}€/mois
-            - Rentabilité nette : {renta_nette}%
+            - CASH-FLOW NET : {cash_flow:.2f}€/mois
+            - Rentabilité nette : {renta_nette:.2f}%
 
-            Notes supplémentaires de l'utilisateur : {notes_utilisateur}
+            Notes de l'utilisateur (travaux, locataires, emplacement) : {notes_utilisateur}
 
             Ta mission :
-            1. Donne un avis détaillé et sans langue de bois sur ce projet. 
-            2. Si le cash-flow est faible ou négatif, sois très critique.
-            3. Analyse les notes (travaux, locataires) pour identifier des risques ou opportunités cachées.
-            4. Donne une note finale de 1 à 10.
-            5. Termine par 3 conseils stratégiques pour les futurs biens de cet utilisateur.
+            1. Analyse cash-flow : Est-ce que l'investisseur s'enrichit ou s'appauvrit chaque mois ?
+            2. Analyse des risques : Que penses-tu des notes sur les travaux ou les locataires ?
+            3. Verdict : Donne une note sur 10 (sois sévère).
+            4. Conseils futurs : Donne 3 astuces pour améliorer ce projet ou les prochains.
             """
             
             with st.spinner("L'expert analyse vos chiffres..."):
+                # On force l'utilisation de la version stable
                 response = model.generate_content(prompt)
                 st.subheader("🧐 Analyse de l'Expert IA")
                 st.write(response.text)
                 
         except Exception as e:
-            st.error(f"Une erreur est survenue : {e}")
+            # Si gemini-1.5-flash échoue encore, on essaie le modèle pro par sécurité
+            try:
+                model_alt = genai.GenerativeModel('gemini-pro')
+                response = model_alt.generate_content(prompt)
+                st.subheader("🧐 Analyse de l'Expert IA (Mode Secours)")
+                st.write(response.text)
+            except:
+                st.error(f"Erreur persistante : {e}. Vérifie que ta clé API est bien active sur Google AI Studio.")
