@@ -3,6 +3,8 @@ import google.generativeai as genai
 import plotly.graph_objects as go
 from fpdf import FPDF
 from datetime import datetime
+import requests
+import json
 
 # --- CONFIGURATION STYLE APPLE ---
 st.set_page_config(page_title="ImmoScore Ultra", layout="wide", page_icon="💎")
