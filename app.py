@@ -1,98 +1,106 @@
 import streamlit as st
 import google.generativeai as genai
+import plotly.graph_objects as go
 from datetime import datetime
 
-# --- CONFIGURATION ESTHÉTIQUE ---
-st.set_page_config(page_title="ImmoScore IA", page_icon="💎", layout="centered")
+# --- CONFIGURATION PRO ---
+st.set_page_config(page_title="ImmoInvest AI", page_icon="📈", layout="wide")
 
-# CSS pour un look "Neumorphic / Mobile App"
+# Design CSS Avancé
 st.markdown("""
     <style>
-    .stTabs [data-baseweb="tab-list"] {gap: 10px;}
-    .stTabs [data-baseweb="tab"] {background-color: #f0f2f6; border-radius: 10px; padding: 10px 20px;}
-    .stTabs [aria-selected="true"] {background-color: #007BFF !important; color: white !important;}
-    div[data-testid="stExpander"] {border: none; background-color: #f8f9fa; border-radius: 15px; margin-bottom: 10px;}
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+    html, body, [class*="css"]  { font-family: 'Inter', sans-serif; }
+    .main { background-color: #f8f9fa; }
+    .stMetric { background-color: white; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; }
+    div[data-testid="stExpander"] { border-radius: 15px; background-color: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .stButton>button { border-radius: 12px; background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%); color: white; border: none; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- INITIALISATION & SIDEBAR (Déplacée en haut pour éviter l'erreur) ---
-if 'bibliotheque' not in st.session_state:
-    st.session_state.bibliotheque = []
+# Récupération de la clé API via les Secrets
+try:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=API_KEY)
+except:
+    st.error("⚠️ La clé API n'est pas configurée dans les Secrets de l'application.")
 
+# --- MOTEUR DE CALCUL DÉTAILLÉ ---
 with st.sidebar:
-    st.title("⚙️ Paramètres")
-    api_key = st.text_input("Clé API Gemini", type="password")
-    st.info("La clé API est nécessaire pour l'analyse par l'IA.")
+    st.header("📍 Localisation & Type")
+    nom_bien = st.text_input("Nom du projet", "Appartement T3 - Centre")
+    ville = st.text_input("Ville", "Bordeaux")
+    type_bien = st.selectbox("Type", ["Ancien (7.5% notaire)", "Neuf (2.5% notaire)"])
+    notaire_taux = 0.025 if "Neuf" in type_bien else 0.075
 
-# --- LOGIQUE IA SÉCURISÉE ---
-def analyser_bien(key, donnees):
-    try:
-        genai.configure(api_key=key)
-        models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        model_name = 'models/gemini-1.5-flash' if 'models/gemini-1.5-flash' in models else models[0]
-        model = genai.GenerativeModel(model_name)
+st.title("💎 ImmoInvest AI")
+st.markdown("##### L'expertise immobilière augmentée par l'intelligence artificielle.")
+
+col_left, col_right = st.columns([1, 1.2], gap="large")
+
+with col_left:
+    with st.expander("💰 Coûts d'acquisition", expanded=True):
+        prix_net = st.number_input("Prix d'achat net vendeur (€)", value=150000, step=5000)
+        frais_agence = st.number_input("Frais d'agence (€)", value=0)
+        frais_notaire = int(prix_net * notaire_taux)
+        st.caption(f"Frais de notaire estimés : {frais_notaire} €")
+        travaux = st.number_input("Budget travaux (€)", value=10000)
+        mobilier = st.number_input("Ameublement (€)", value=0)
+        total_acquisition = prix_net + frais_agence + frais_notaire + travaux + mobilier
+    
+    with st.expander("🏦 Financement & Charges", expanded=True):
+        apport = st.number_input("Apport personnel (€)", value=20000)
+        taux = st.number_input("Taux d'intérêt (%)", value=3.8, format="%.2f")
+        duree = st.slider("Durée du prêt (ans)", 5, 25, 20)
+        montant_pret = total_acquisition - apport
         
-        prompt = f"""Tu es un investisseur immo impitoyable. Analyse : {donnees}. 
-        Donne : 1. Une note sur 10. 2. Un avis tranché sur le cash-flow. 3. Le risque majeur."""
-        res = model.generate_content(prompt)
-        return res.text
+        # Calcul mensualité
+        if montant_pret > 0:
+            tm = (taux/100)/12
+            n = duree * 12
+            mensualite = montant_pret * (tm * (1+tm)**n) / ((1+tm)**n - 1)
+        else: mensualite = 0
+        
+        st.info(f"Mensualité estimée : {int(mensualite)} €/mois")
+        taxe_fonciere = st.number_input("Taxe foncière annuelle (€)", value=800)
+        charges_copro = st.number_input("Charges copro annuelles (€)", value=600)
+
+with col_right:
+    with st.expander("📈 Revenus Locatifs", expanded=True):
+        loyer_hc = st.number_input("Loyer mensuel HC (€)", value=850)
+        vacance = st.slider("Vacance locative (%)", 0, 10, 5)
+        loyer_annuel_net = (loyer_hc * 12) * (1 - vacance/100)
+    
+    # CALCULS FINAUX
+    charges_annuelles = taxe_fonciere + charges_copro
+    cash_flow_mensuel = (loyer_annuel_net / 12) - mensualite - (charges_annuelles / 12)
+    renta_nette = ((loyer_annuel_net - charges_annuelles) / total_acquisition) * 100
+
+    # AFFICHAGE DASHBOARD
+    st.subheader("Bilan Financier")
+    c1, c2 = st.columns(2)
+    c1.metric("Cash-Flow Mensuel", f"{int(cash_flow_mensuel)} €", delta=f"{int(cash_flow_mensuel)} €")
+    c2.metric("Rentabilité Nette", f"{renta_nette:.2f} %")
+
+    # GRAPHIQUE
+    labels = ['Crédit', 'Charges/Impôts', 'Cash-Flow']
+    v_cf = max(0, cash_flow_mensuel)
+    fig = go.Figure(data=[go.Pie(labels=labels, values=[mensualite, charges_annuelles/12, v_cf], hole=.4)])
+    fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250)
+    st.plotly_chart(fig, use_container_width=True)
+
+# --- ANALYSE IA ---
+if st.button("✨ GÉNÉRER L'ANALYSE EXPERT"):
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        prompt = f"""Analyse ce projet à {ville}:
+        Achat: {total_acquisition}€, Loyer: {loyer_hc}€, Cashflow: {cash_flow_mensuel}€/mois. 
+        Renta: {renta_nette}%. Travaux: {travaux}€. Notes: {nom_bien}.
+        Sois très strict. Donne une note /10 et analyse si le projet est viable ou dangereux."""
+        
+        with st.spinner("L'IA analyse le marché..."):
+            response = model.generate_content(prompt)
+            st.markdown("### 🤖 Verdict de l'IA")
+            st.write(response.text)
     except Exception as e:
-        return f"Erreur IA : {str(e)}"
-
-# --- INTERFACE PRINCIPALE ---
-tab1, tab2 = st.tabs(["➕ Nouveau Projet", "📂 Bibliothèque"])
-
-with tab1:
-    st.subheader("Calculateur de Rentabilité")
-    
-    nom_bien = st.text_input("Nom du bien", placeholder="Ex: Studio Lyon 7")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        p_achat = st.number_input("Prix d'achat (€)", value=120000, step=1000)
-        travaux = st.number_input("Travaux (€)", value=0, step=500)
-    with col2:
-        loyer = st.number_input("Loyer mensuel (€)", value=700, step=50)
-        charges = st.number_input("Charges/Taxes/mois (€)", value=120, step=10)
-
-    f_notaire = int(p_achat * 0.08)
-    mensualite = st.number_input("Mensualité crédit (€)", value=550)
-    notes = st.text_area("Notes (état, quartier...)", placeholder="Toiture neuve, quartier calme...")
-
-    total_proj = p_achat + f_notaire + travaux
-    cash_flow = loyer - mensualite - charges
-    renta_net = ((loyer - charges) * 12 / total_proj) * 100 if total_proj > 0 else 0
-
-    st.divider()
-    
-    if st.button("🚀 Analyser & Sauvegarder"):
-        if not api_key:
-            st.error("⚠️ Erreur : Entre ta clé API dans le menu à gauche.")
-        else:
-            with st.spinner("L'IA réfléchit..."):
-                avis_ia = analyser_bien(api_key, {"projet": total_proj, "cashflow": cash_flow, "notes": notes})
-                bien = {
-                    "id": datetime.now().timestamp(), # ID unique pour supprimer
-                    "nom": nom_bien,
-                    "date": datetime.now().strftime("%d/%m %H:%M"),
-                    "renta": renta_net,
-                    "cf": cash_flow,
-                    "avis": avis_ia
-                }
-                st.session_state.bibliotheque.append(bien)
-                st.balloons()
-                st.markdown(f"### Verdict : \n {avis_ia}")
-
-with tab2:
-    st.subheader("Mes analyses enregistrées")
-    if not st.session_state.bibliotheque:
-        st.write("Aucun bien pour le moment.")
-    else:
-        for i, b in enumerate(reversed(st.session_state.bibliotheque)):
-            with st.expander(f"{b['nom']} - {b['renta']:.1f}% Renta"):
-                st.write(f"**Date :** {b['date']}")
-                st.write(f"**Cash-flow :** {b['cf']}€/mois")
-                st.info(f"**Avis IA :**\n{b['avis']}")
-                # Bouton de suppression unique
-                if st.button(f"Supprimer {b['nom']}", key=f"del_{b['id']}"):
-                    st.session_state.bibliotheque.pop(len(st.session_state.bibliotheque)-1-i)
+        st.error(f"L'analyse a échoué. Vérifiez votre configuration. ({e})")
