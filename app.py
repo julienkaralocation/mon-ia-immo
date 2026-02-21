@@ -5,26 +5,38 @@ from datetime import datetime
 import requests
 import json
 
-# --- FORCER LE MODE CLAIR ET LISIBILITÉ MOBILE ---
+# --- CONFIGURATION ÉPURÉE ---
 st.set_page_config(page_title="Netly", layout="wide")
 
 st.markdown("""
     <style>
+    /* Forcer le rendu Apple : texte noir sur fond blanc pur */
     .stApp { background-color: #ffffff !important; }
     h1, h2, h3, h4, p, span, label, div, .stMetricValue { 
         color: #1d1d1f !important; 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     div[data-testid="stMetric"] { 
         background-color: #f5f5f7 !important; 
-        border-radius: 15px;
+        border-radius: 12px;
         padding: 15px;
+        border: 1px solid #e5e5e7;
     }
     .stButton>button {
         background-color: #0071e3 !important;
         color: white !important;
-        border-radius: 20px;
-        font-weight: 600;
+        border-radius: 12px;
+        font-weight: 500;
+        border: none;
         height: 3em;
+        width: 100%;
+    }
+    footer {visibility: hidden;}
+    .signature {
+        text-align: center;
+        padding: 20px;
+        font-size: 12px;
+        color: #86868b !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -41,34 +53,34 @@ def analyser_avec_ia(prompt):
         gen_url = f"https://generativelanguage.googleapis.com/v1beta/{selected_model}:generateContent?key={api_key}"
         res = requests.post(gen_url, headers=headers, json={"contents": [{"parts": [{"text": prompt}]}]})
         return res.json()['candidates'][0]['content']['parts'][0]['text']
-    except: return "L'IA n'est pas disponible pour le moment."
+    except: return "Analyse indisponible."
 
 # --- INTERFACE ---
 st.title("Netly")
-st.markdown("### Analyse Financière Haute Précision")
+st.markdown("##### Analyse d'investissement immobilier")
 
 col1, col2, col3 = st.columns([1, 1, 1.2], gap="large")
 
 with col1:
-    st.subheader("🏙️ Investissement")
-    nom_projet = st.text_input("Nom du projet", "T2 Centre Ville")
-    p_achat = st.number_input("Prix Net Vendeur (€)", value=120000, step=1000)
-    travaux = st.number_input("Budget Travaux (€)", value=15000, step=500)
-    meubles = st.number_input("Ameublement (€)", value=3000, step=500)
+    st.subheader("Projet")
+    nom_projet = st.text_input("Nom", "Appartement T2")
+    p_achat = st.number_input("Prix d'achat (€)", value=120000)
+    travaux = st.number_input("Travaux (€)", value=15000)
+    meubles = st.number_input("Meubles (€)", value=3000)
     frais_agence = st.number_input("Frais d'agence (€)", value=0)
     
-    type_immo = st.radio("Frais de notaire", ["Ancien (~7.5%)", "Neuf (~2.5%)"], horizontal=True)
+    type_immo = st.radio("Notaire", ["Ancien", "Neuf"], horizontal=True)
     tx_notaire = 0.075 if "Ancien" in type_immo else 0.025
     notaire = int(p_achat * tx_notaire)
     
     total_projet = p_achat + travaux + meubles + frais_agence + notaire
-    st.info(f"**Coût Total : {total_projet:,} €**")
+    st.caption(f"Coût total : {total_projet:,} €")
 
 with col2:
-    st.subheader("🏦 Financement & Charges")
-    apport = st.number_input("Apport Personnel (€)", value=15000)
-    duree = st.select_slider("Durée (ans)", options=[15, 20, 25], value=20)
-    taux = st.slider("Taux (%)", 0.5, 6.0, 3.8, 0.1)
+    st.subheader("Charges & Crédit")
+    apport = st.number_input("Apport (€)", value=15000)
+    duree = st.select_slider("Années", options=[15, 20, 25], value=20)
+    taux = st.slider("Taux (%)", 0.5, 6.0, 3.8)
     
     pret = total_projet - apport
     if pret > 0:
@@ -77,42 +89,31 @@ with col2:
     else: mensualite = 0
     
     st.divider()
-    charges_m = st.number_input("Charges Copro mensuelles (€)", value=80)
-    taxe_f = st.number_input("Taxe Foncière annuelle (€)", value=900)
-    # MODIFICATION : PASSAGE EN MONTANT FIXE ANNUEL
-    frais_gestion_annuel = st.number_input("Frais Gestion + Assurances (€/an)", value=600, step=50)
-    vacance_p = st.slider("Vacance locative (%)", 0, 10, 4)
+    charges_m = st.number_input("Copro (€/mois)", value=80)
+    taxe_f = st.number_input("Taxe Foncière (€/an)", value=900)
+    frais_fixes_annuels = st.number_input("Gestion & Assurances (€/an)", value=600)
+    vacance_p = st.slider("Vacance (%)", 0, 10, 4)
 
 with col3:
-    st.subheader("📈 Rendement Réel")
-    loyer_hc = st.number_input("Loyer Mensuel HC (€)", value=750)
+    st.subheader("Performance")
+    loyer_hc = st.number_input("Loyer mensuel HC (€)", value=750)
     
-    # Calculs précis
-    revenu_annuel_theorique = loyer_hc * 12
-    perte_vacance = revenu_annuel_theorique * (vacance_p / 100)
+    revenu_annuel = loyer_hc * 12
+    perte_vacance = revenu_annuel * (vacance_p / 100)
+    charges_totales = (charges_m * 12) + taxe_f + frais_fixes_annuels + perte_vacance
     
-    # Calcul Cash-flow avec les nouveaux frais fixes
-    charges_annuelles_totales = (charges_m * 12) + taxe_f + frais_gestion_annuel + perte_vacance
-    cash_flow = (revenu_annuel_theorique - charges_annuelles_totales) / 12 - mensualite
-    renta_nette = ((revenu_annuel_theorique - charges_annuelles_totales) / total_projet) * 100
+    cash_flow = (revenu_annuel - charges_totales) / 12 - mensualite
+    renta_nette = ((revenu_annuel - charges_totales) / total_projet) * 100
 
     st.metric("Cash-flow Net", f"{int(cash_flow)} €/mois")
     st.metric("Rentabilité Nette", f"{renta_nette:.2f} %")
     
-    notes = st.text_area("📝 Notes de l'expert", placeholder="Ex: État de la copropriété, profil locataire...", height=150)
+    notes = st.text_area("Observations", placeholder="Locataire en place, état des parties communes...", height=100)
 
-st.divider()
-
-if st.button("🚀 LANCER L'ANALYSE IA"):
-    with st.spinner("Analyse en cours..."):
-        prompt = f"""Expert Immobilier. Analyse ce projet :
-        - Coût Total : {total_projet}€
-        - Loyer HC : {loyer_hc}€/mois
-        - Charges (Copro + Taxe F + Gestion/Assurance) : {int(charges_annuelles_totales)}€/an
-        - Cashflow : {int(cash_flow)}€/mois
-        - Renta Nette : {renta_nette:.2f}%
-        - Notes : {notes}
-        Donne un verdict tranché, une note sur 10 et les 2 points de vigilance."""
-        
+if st.button("LANCER L'AUDIT"):
+    with st.spinner("Audit en cours..."):
+        prompt = f"Expert. Projet: {total_projet}€. Loyer: {loyer_hc}€. CF: {int(cash_flow)}€. Notes: {notes}. Note/10 et 2 points clés."
         verdict = analyser_avec_ia(prompt)
-        st.markdown(f"### 🤖 Verdict de l'IA\n{verdict}")
+        st.markdown(f"**Verdict Netly**\n\n{verdict}")
+
+st.markdown('<div class="signature">Propulsé par Netly • Modèle expert Gemini 1.5</div>', unsafe_allow_html=True)
