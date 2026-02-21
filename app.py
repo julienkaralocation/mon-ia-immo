@@ -24,11 +24,12 @@ st.markdown("""
         color: white !important;
         border-radius: 20px;
         font-weight: 600;
+        height: 3em;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- LOGIQUE IA AUTO-DÉTECTION ---
+# --- LOGIQUE IA ---
 def analyser_avec_ia(prompt):
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
@@ -61,13 +62,13 @@ with col1:
     notaire = int(p_achat * tx_notaire)
     
     total_projet = p_achat + travaux + meubles + frais_agence + notaire
-    st.info(f"**Coût Total du Projet : {total_projet:,} €**")
+    st.info(f"**Coût Total : {total_projet:,} €**")
 
 with col2:
     st.subheader("🏦 Financement & Charges")
     apport = st.number_input("Apport Personnel (€)", value=15000)
-    duree = st.select_slider("Durée du crédit (ans)", options=[15, 20, 25], value=20)
-    taux = st.slider("Taux d'intérêt (%)", 0.5, 6.0, 3.8, 0.1)
+    duree = st.select_slider("Durée (ans)", options=[15, 20, 25], value=20)
+    taux = st.slider("Taux (%)", 0.5, 6.0, 3.8, 0.1)
     
     pret = total_projet - apport
     if pret > 0:
@@ -78,7 +79,8 @@ with col2:
     st.divider()
     charges_m = st.number_input("Charges Copro mensuelles (€)", value=80)
     taxe_f = st.number_input("Taxe Foncière annuelle (€)", value=900)
-    gestion_p = st.slider("Frais de Gestion + Assurance (%)", 0, 15, 8)
+    # MODIFICATION : PASSAGE EN MONTANT FIXE ANNUEL
+    frais_gestion_annuel = st.number_input("Frais Gestion + Assurances (€/an)", value=600, step=50)
     vacance_p = st.slider("Vacance locative (%)", 0, 10, 4)
 
 with col3:
@@ -88,29 +90,29 @@ with col3:
     # Calculs précis
     revenu_annuel_theorique = loyer_hc * 12
     perte_vacance = revenu_annuel_theorique * (vacance_p / 100)
-    frais_gestion = revenu_annuel_theorique * (gestion_p / 100)
     
-    cash_flow = (revenu_annuel_theorique - perte_vacance - frais_gestion - taxe_f - (charges_m * 12)) / 12 - mensualite
-    renta_nette = ((revenu_annuel_theorique - perte_vacance - frais_gestion - taxe_f - (charges_m * 12)) / total_projet) * 100
+    # Calcul Cash-flow avec les nouveaux frais fixes
+    charges_annuelles_totales = (charges_m * 12) + taxe_f + frais_gestion_annuel + perte_vacance
+    cash_flow = (revenu_annuel_theorique - charges_annuelles_totales) / 12 - mensualite
+    renta_nette = ((revenu_annuel_theorique - charges_annuelles_totales) / total_projet) * 100
 
     st.metric("Cash-flow Net", f"{int(cash_flow)} €/mois")
     st.metric("Rentabilité Nette", f"{renta_nette:.2f} %")
     
-    notes = st.text_area("📝 Notes de l'expert (locataire, quartier...)", height=150)
+    notes = st.text_area("📝 Notes de l'expert", placeholder="Ex: État de la copropriété, profil locataire...", height=150)
 
 st.divider()
 
 if st.button("🚀 LANCER L'ANALYSE IA"):
-    with st.spinner("L'IA examine chaque chiffre..."):
+    with st.spinner("Analyse en cours..."):
         prompt = f"""Expert Immobilier. Analyse ce projet :
-        - Coût Total : {total_projet}€ (dont {travaux}€ travaux)
+        - Coût Total : {total_projet}€
         - Loyer HC : {loyer_hc}€/mois
-        - Charges mensuelles : {charges_m}€
-        - Taxe foncière : {taxe_f}€/an
+        - Charges (Copro + Taxe F + Gestion/Assurance) : {int(charges_annuelles_totales)}€/an
         - Cashflow : {int(cash_flow)}€/mois
         - Renta Nette : {renta_nette:.2f}%
         - Notes : {notes}
-        Donne un verdict tranché, une note sur 10 et les 2 points de vigilance majeurs."""
+        Donne un verdict tranché, une note sur 10 et les 2 points de vigilance."""
         
         verdict = analyser_avec_ia(prompt)
         st.markdown(f"### 🤖 Verdict de l'IA\n{verdict}")
