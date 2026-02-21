@@ -5,32 +5,31 @@ from datetime import datetime
 import requests
 import json
 
-# 1. CONFIGURATION DE LA PAGE
+# --- CONFIGURATION ÉPURÉE ---
 st.set_page_config(page_title="Netly", layout="wide")
 
-# 2. FORCE L'ICÔNE IPHONE ET LE STYLE APPLE
-# REMPLACE BIEN L'URL CI-DESSOUS PAR TON LIEN DIRECT POSTIMAGES (celui qui finit par .png)
-icon_url = "https://i.postimg.cc/vZxYpX9N/votre-icone.png" 
+# --- L'ICÔNE IPHONE (SANS BUG) ---
+# Colle ton lien Postimages entre les guillemets ci-dessous
+icon_url = "TON_LIEN_DIRECT_ICI.png" 
 
-st.markdown(f"""
-    <head>
-        <link rel="apple-touch-icon" href="{icon_url}">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    </head>
+st.markdown(f'<link rel="apple-touch-icon" href="{icon_url}">', unsafe_allow_html=True)
+st.markdown('<meta name="apple-mobile-web-app-capable" content="yes">', unsafe_allow_html=True)
+
+# --- STYLE VISUEL ---
+st.markdown("""
     <style>
-    .stApp {{ background-color: #ffffff !important; }}
-    h1, h2, h3, h4, p, span, label, div, .stMetricValue {{ 
+    .stApp { background-color: #ffffff !important; }
+    h1, h2, h3, h4, p, span, label, div, .stMetricValue { 
         color: #1d1d1f !important; 
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }}
-    div[data-testid="stMetric"] {{ 
+    }
+    div[data-testid="stMetric"] { 
         background-color: #f5f5f7 !important; 
         border-radius: 12px;
         padding: 15px;
         border: 1px solid #e5e5e7;
-    }}
-    .stButton>button {{
+    }
+    .stButton>button {
         background-color: #0071e3 !important;
         color: white !important;
         border-radius: 12px;
@@ -38,19 +37,16 @@ st.markdown(f"""
         border: none;
         height: 3em;
         width: 100%;
-    }}
-    footer {{visibility: hidden;}}
-    .signature {{
+    }
+    footer {visibility: hidden;}
+    .signature {
         text-align: center;
         padding: 20px;
         font-size: 12px;
         color: #86868b !important;
-    }}
+    }
     </style>
     """, unsafe_allow_html=True)
-
-# 3. LE RESTE DE TON CODE (TITRE ET ANALYSE)
-st.title("Netly")
 
 # --- LOGIQUE IA ---
 def analyser_avec_ia(prompt):
