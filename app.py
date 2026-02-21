@@ -8,7 +8,7 @@ import json
 # --- CONFIGURATION ÉPURÉE ---
 st.set_page_config(
     page_title="Netly",
-    page_icon="https://i.postimg.cc/6qPDSVdQ/apple-touch-icon.png", https://i.postimg.cc/6qPDSVdQ/apple-touch-icon.png
+    page_icon="https://i.postimg.cc/6qPDSVdQ/apple-touch-icon.png",
     layout="wide"
 )
 
