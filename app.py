@@ -8,9 +8,13 @@ import json
 # --- CONFIGURATION ÉPURÉE ---
 st.set_page_config(page_title="Netly", layout="wide")
 
+# Remplace tout ton ancien bloc st.markdown par celui-ci :
 st.markdown("""
+    <head>
+        <link rel="apple-touch-icon" href="https://i.postimg.cc/6qPDSVdQ/apple-touch-icon.png">
+    </head>
     <style>
-    /* Forcer le rendu Apple : texte noir sur fond blanc pur */
+    /* Garde ton style Apple ici */
     .stApp { background-color: #ffffff !important; }
     h1, h2, h3, h4, p, span, label, div, .stMetricValue { 
         color: #1d1d1f !important; 
