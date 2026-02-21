@@ -6,9 +6,12 @@ import requests
 import json
 
 # --- CONFIGURATION ÉPURÉE ---
-st.set_page_config(page_title="Netly", layout="wide")
+st.set_page_config(
+    page_title="Netly",
+    page_icon="https://i.postimg.cc/6qPDSVdQ/apple-touch-icon.png", https://i.postimg.cc/6qPDSVdQ/apple-touch-icon.png
+    layout="wide"
+)
 
-# Remplace tout ton ancien bloc st.markdown par celui-ci :
 st.markdown("""
     <head>
         <link rel="apple-touch-icon" href="https://i.postimg.cc/6qPDSVdQ/apple-touch-icon.png">
