@@ -6,7 +6,7 @@ import requests
 import json
 
 # --- FORCER LE MODE CLAIR ET LISIBILITÉ MOBILE ---
-st.set_page_config(page_title="ImmoScore Ultra V4", layout="wide")
+st.set_page_config(page_title="Netly", layout="wide")
 
 st.markdown("""
     <style>
@@ -44,7 +44,7 @@ def analyser_avec_ia(prompt):
     except: return "L'IA n'est pas disponible pour le moment."
 
 # --- INTERFACE ---
-st.title("💎 ImmoScore Ultra")
+st.title("Netly")
 st.markdown("### Analyse Financière Haute Précision")
 
 col1, col2, col3 = st.columns([1, 1, 1.2], gap="large")
